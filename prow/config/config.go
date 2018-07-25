@@ -30,7 +30,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/robfig/cron.v2"
+	cron "gopkg.in/robfig/cron.v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -213,8 +213,17 @@ type Sinker struct {
 	MaxPodAge time.Duration `json:"-"`
 }
 
+//Spyglass hold config for Spyglass
+type Spyglass struct {
+	// Viewers is a map of Regexp to viewer names that defines which sets
+	// of artifacts need to be consumed by which viewers
+	Viewers map[string][]string `json:"viewers,omitempty"`
+}
+
 // Deck holds config for deck.
 type Deck struct {
+	// Spyglass specifies which viewers wil be used for which artifacts when viewing a job in Deck
+	Spyglass Spyglass `json:"spyglass,omitempty"`
 	// TideUpdatePeriodString compiles into TideUpdatePeriod at load time.
 	TideUpdatePeriodString string `json:"tide_update_period,omitempty"`
 	// TideUpdatePeriod specifies how often Deck will fetch status from Tide. Defaults to 10s.
