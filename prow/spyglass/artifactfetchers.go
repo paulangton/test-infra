@@ -17,7 +17,13 @@ limitations under the License.
 package spyglass
 
 import (
+	"errors"
+
 	"k8s.io/test-infra/prow/spyglass/viewers"
+)
+
+var (
+	ErrCannotParseSource = errors.New("could not create job source from provided source")
 )
 
 // JobSource gets information about a location storing the results of a single Prow job
@@ -37,8 +43,10 @@ type ArtifactFetcher interface {
 	// with the job path prefix removed.
 	// (e.g. return names of the format artifacts/junit_01.xml instead of
 	// logs/ci-example-run/1456/artifacts/junit_01.xml)
-	Artifacts(src *JobSource) []string
+	Artifacts(src JobSource) []string
 	// Artifact constructs and returns an artifact object ready for read operations from the
 	// job source and artifact name.
-	Artifact(src *JobSource, name string) viewers.Artifact
+	Artifact(src JobSource, name string) viewers.Artifact
+	// CreateJobSource tries to create a usable job source from the provided source string for this fetcher
+	CreateJobSource(src string) (JobSource, error)
 }

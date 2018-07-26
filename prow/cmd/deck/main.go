@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -32,10 +33,12 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/NYTimes/gziphandler"
 	"github.com/ghodss/yaml"
 	"github.com/gorilla/sessions"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/option"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -174,7 +177,11 @@ func prodOnlyMain(configAgent *config.Agent, o options, mux *http.ServeMux) *htt
 	ja := jobs.NewJobAgent(kc, plClients, configAgent)
 	ja.Start()
 
-	sg := spyglass.New(ja)
+	c, err := storage.NewClient(context.Background(), option.WithoutAuthentication()) //TODO: Need to support authenitcated buckets
+	if err != nil {
+		logrus.WithError(err).Fatal("Error getting GCS client")
+	}
+	sg := spyglass.New(ja, []spyglass.ArtifactFetcher{spyglass.NewGCSArtifactFetcher(c)})
 
 	// setup prod only handlers
 	mux.Handle("/data.js", gziphandler.GzipHandler(handleData(ja)))

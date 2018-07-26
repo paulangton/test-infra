@@ -17,12 +17,10 @@ limitations under the License.
 package spyglass
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -32,16 +30,15 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/api/option"
 
 	"k8s.io/test-infra/prow/spyglass/viewers"
 )
 
 // A fetcher for a GCS client
 type GCSArtifactFetcher struct {
-	Client      *storage.Client
-	XMLEndpoint string
-	WithTLS     bool
+	client      *storage.Client
+	xmlEndpoint string
+	withTLS     bool
 }
 
 // A location in GCS where Prow job-specific artifacts are stored. This implementation assumes
@@ -57,15 +54,11 @@ type GCSJobSource struct {
 }
 
 // NewGCSArtifactFetcher creates a new ArtifactFetcher with a real GCS Client
-func NewGCSArtifactFetcher() *GCSArtifactFetcher {
-	c, err := storage.NewClient(context.Background(), option.WithoutAuthentication())
-	if err != nil {
-		log.Fatal(err)
-	}
+func NewGCSArtifactFetcher(c *storage.Client) *GCSArtifactFetcher {
 	return &GCSArtifactFetcher{
-		Client:      c,
-		XMLEndpoint: "https://storage.googleapis.com/",
-		WithTLS:     true,
+		client:      c,
+		xmlEndpoint: "https://storage.googleapis.com/",
+		withTLS:     true,
 	}
 }
 
@@ -135,13 +128,13 @@ func (af *GCSArtifactFetcher) Artifacts(src JobSource) []string {
 	var wg sync.WaitGroup
 	artStart := time.Now()
 	artifacts := []string{}
-	endpoint := af.XMLEndpoint + src.BucketName()
+	endpoint := af.xmlEndpoint + src.BucketName()
 	prefix := src.JobPath()
 	maxResults := 1000
 	bodies := [][]byte{}
 	marker := GCSMarker{}
 	c := http.Client{}
-	if !af.WithTLS {
+	if !af.withTLS {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -197,10 +190,18 @@ func (af *GCSArtifactFetcher) Artifacts(src JobSource) []string {
 // to get read handles. If the artifactName is not a valid key in the bucket a handle will still be
 // constructed and returned, but all read operations will fail (dictated by behavior of golang GCS lib).
 func (af *GCSArtifactFetcher) Artifact(src JobSource, artifactName string) viewers.Artifact {
-	bkt := af.Client.Bucket(src.BucketName())
+	bkt := af.client.Bucket(src.BucketName())
 	obj := bkt.Object(path.Join(src.JobPath(), artifactName))
 	link := fmt.Sprintf("https://storage.googleapis.com/%s/%s/%s", src.BucketName(), src.JobPath(), artifactName)
 	return NewGCSArtifact(obj, link, artifactName)
+}
+
+// CreateJobSource tries to create a GCS job source from the provided string
+func (af *GCSArtifactFetcher) CreateJobSource(src string) (JobSource, error) {
+	if isGCSSource(src) {
+		return NewGCSJobSource(src), nil
+	}
+	return &GCSJobSource{}, ErrCannotParseSource
 }
 
 // CanonicalLink gets a link to the location of job-specific artifacts in GCS

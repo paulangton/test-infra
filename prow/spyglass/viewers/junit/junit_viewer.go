@@ -25,6 +25,7 @@ import (
 
 	junit "github.com/joshdk/go-junit"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/prow/spyglass/viewers"
 )
 

@@ -107,10 +107,13 @@ func (a *PodLogArtifact) ReadAtMost(n int64) ([]byte, error) {
 
 // ReadTail reads the last n bytes of the pod log
 func (a *PodLogArtifact) ReadTail(n int64) ([]byte, error) {
-	logs := a.fetchLogs()
+	logs, err := a.ja.GetJobLogTail(a.name, a.buildID, n)
+	if err != nil {
+		logrus.WithField("artifactName", a.name).WithError(err).Error("Error getting pod logs tail")
+	}
 	off := int64(len(logs)) - n - 1
 	p := []byte{}
-	_, err := bytes.NewReader(logs).ReadAt(p, off)
+	_, err = bytes.NewReader(logs).ReadAt(p, off)
 	if err != nil {
 		logrus.WithError(err).Error("Failed to read pod logs.")
 	}
@@ -132,7 +135,7 @@ func (a *PodLogArtifact) fetchLogs() []byte {
 	// logs, err = a.ja.GetJobLogByPodName(a.podName) TODO I'd like to support this eventually
 	logs, err = a.ja.GetJobLog(a.name, a.buildID)
 	if err != nil {
-		logrus.WithError(err).Error("Error getting pod logs")
+		logrus.WithField("artifactName", a.name).WithError(err).Error("Error getting pod logs")
 	}
 	return logs
 }

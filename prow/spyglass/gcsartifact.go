@@ -56,7 +56,7 @@ func NewGCSArtifact(handle *storage.ObjectHandle, link string, path string) *GCS
 func (a *GCSArtifact) Size() int64 {
 	attrs, err := a.handle.Attrs(context.Background())
 	if err != nil {
-		logrus.WithError(err).Error("Could not retrieve object attributes", err)
+		logrus.WithError(err).Error("Could not retrieve object attributes")
 	}
 	return attrs.Size
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package spyglass creates views for Prow job artifacts
+// Package spyglass creates views for Prow job artifacts.
 package spyglass
 
 import (
@@ -28,11 +28,29 @@ import (
 	"k8s.io/test-infra/prow/spyglass/viewers"
 )
 
-// Spyglass records which sets of artifacts need views for a Prow job
+var (
+	// These are artifacts that we guarantee will be created with every job.
+	// If they are found ina storage location, the stored ones will be used,
+	// otherwise we will try to fetch them from the job runtimeIn the future
+	// this might contain job metadata, podspec, etc.
+	guaranteedArtifacts = []string{"build-log.txt"}
+)
+
+// Spyglass records which sets of artifacts need views for a Prow job. The metaphor
+// can be understood as follows: A spyglass receives light from a source through
+// an eyepiece, which has a lens that ultimately presents a view of the light source
+// to the observer. Spyglass receives light (artifacts) via a
+// source (src) through the eyepiece (Eyepiece) and presents the view (what you see
+// in your browser) via a lens (Lens).
 type Spyglass struct {
 
 	// Lenses is a map of names of views to their corresponding lenses
 	Lenses map[string]Lens
+
+	// Eyepieces is a list of ArtifactFetchers used by Spyglass. Whenever spyglass
+	// receives a request to view artifacts from a source, it will check to see if it
+	// can handle that source with one of its registered eyepieces
+	Eyepieces []ArtifactFetcher
 
 	// Ja contains information about the current jobs in deck
 	Ja *jobs.JobAgent
@@ -58,17 +76,18 @@ type ViewRequest struct {
 }
 
 // NewSpyglass constructs a spyglass object from a JobAgent
-func New(ja *jobs.JobAgent) *Spyglass {
+func New(ja *jobs.JobAgent, eyepieces []ArtifactFetcher) *Spyglass {
 	return &Spyglass{
-		Lenses: make(map[string]Lens),
-		Ja:     ja,
+		Lenses:    make(map[string]Lens),
+		Ja:        ja,
+		Eyepieces: eyepieces,
 	}
 }
 
 // Views gets all views of all artifact files matching each regexp with a registered viewer
-func (s *Spyglass) Views(eyepiece map[string][]string) []Lens {
+func (s *Spyglass) Views(matchCache map[string][]string) []Lens {
 	lenses := []Lens{}
-	for viewer, matches := range eyepiece {
+	for viewer, matches := range matchCache {
 		if len(matches) != 0 {
 			title, err := viewers.Title(viewer)
 			if err != nil {
@@ -128,72 +147,81 @@ func (s *Spyglass) Refresh(src string, podName string, viewReq *ViewRequest) Len
 // ListArtifacts handles muxing artifact sources to the correct fetcher implementations to list
 // all available artifact names
 func (s *Spyglass) ListArtifacts(src string) ([]string, error) {
-	artifacts := []string{}
-	var podName string
-	var jobName string
-	var buildID string
-	// First check src
-	if isGCSSource(src) {
-		artifactFetcher := NewGCSArtifactFetcher()
-		gcsJobSource := NewGCSJobSource(src)
-		jobName = gcsJobSource.JobName()
-		buildID = gcsJobSource.BuildID()
-
-		artifacts = append(artifacts, artifactFetcher.Artifacts(gcsJobSource)...)
-
-	}
-	// Then check Prowjob id for pod logs, pod spec, etc
-	if isProwJobSource(src) {
-		parsed := strings.Split(strings.TrimPrefix(src, "prowjob/"), "/")
-		if len(parsed) == 2 {
-			jobName = parsed[0]
-			buildID = parsed[1]
-		} else if len(parsed) == 1 {
-			podName = parsed[0]
-		} else {
-			return []string{}, errors.New("invalid Prowjob source provided")
-		}
-		podLog := NewPodLogArtifact(jobName, buildID, podName, s.Ja)
-		if podLog.Size() != -1 {
-			artifacts = append(artifacts, podLog.JobPath())
+	foundArtifacts := []string{}
+	for _, ep := range s.Eyepieces {
+		jobSource, err := ep.CreateJobSource(src)
+		if err != nil {
+			if err == ErrCannotParseSource {
+				continue
+			}
+			logrus.WithError(err).Error("Error creating job source.")
 		}
 
+		foundArtifacts = append(foundArtifacts, ep.Artifacts(jobSource)...)
 	}
-	return artifacts, nil
+	foundArtifacts = append(foundArtifacts, neededArtifacts(foundArtifacts)...)
+	return foundArtifacts, nil
+}
+
+func neededArtifacts(haveArtifacts []string) []string {
+	needed := guaranteedArtifacts
+	for _, name := range haveArtifacts {
+		for i := 0; i < len(needed); i++ {
+			if name == needed[i] {
+				needed = append(needed[:i], needed[i+1:]...)
+				break
+			}
+		}
+	}
+	return needed
 }
 
 // FetchArtifacts constructs and returns Artifact objects for each artifact name in the list.
 // This includes getting any handles needed for read write operations, direct artifact links, etc.
 func (s *Spyglass) FetchArtifacts(src string, podName string, artifactNames []string) ([]viewers.Artifact, error) {
-	artifacts := []viewers.Artifact{}
-	var jobName string
-	var buildID string
-	// Add any artifacts from GCS
-	if isGCSSource(src) {
-		artifactFetcher := NewGCSArtifactFetcher()
-		gcsJobSource := NewGCSJobSource(src)
-		jobName = gcsJobSource.JobName()
-		buildID = gcsJobSource.BuildID()
-
+	neededNames := neededArtifacts(artifactNames)
+	foundArtifacts := []viewers.Artifact{}
+	for _, ep := range s.Eyepieces {
+		jobSource, err := ep.CreateJobSource(src)
+		if err != nil {
+			if err == ErrCannotParseSource {
+				continue
+			}
+			logrus.WithError(err).Error("Error creating job source.")
+		}
 		artStart := time.Now()
 		for _, name := range artifactNames {
-			artifacts = append(artifacts, artifactFetcher.Artifact(gcsJobSource, name))
+			foundArtifacts = append(foundArtifacts, ep.Artifact(jobSource, name))
 		}
 		artElapsed := time.Since(artStart)
-		logrus.Info("Retrieved GCS artifacts in ", artElapsed)
+		logrus.Info("Retrieved artifacts in ", artElapsed)
 
 	}
 
-	// Add any artifacts discoverable from the Prowjob
-	if podName != "" || isProwJobSource(src) {
-		parsed := strings.Split(strings.TrimPrefix(src, "pj://"), "/")
-		jobName = parsed[0]
-		buildID = parsed[1]
-		podLog := NewPodLogArtifact(jobName, buildID, podName, s.Ja)
-		if podLog.Size() != -1 {
-			artifacts = append(artifacts, podLog)
+	for _, ga := range neededNames {
+		switch ga {
+		case "build-log.txt":
+			if isProwJobSource(src) {
+				parsed := strings.Split(strings.TrimPrefix(src, "prowjob/"), "/")
+				var jobName string
+				var buildID string
+				if len(parsed) == 2 {
+					jobName = parsed[0]
+					buildID = parsed[1]
+				} else if len(parsed) == 1 {
+					podName = parsed[0]
+				} else {
+					return foundArtifacts, errors.New("invalid Prowjob source provided")
+				}
+				podLog := NewPodLogArtifact(jobName, buildID, podName, s.Ja)
+				if podLog.Size() != -1 {
+					foundArtifacts = append(foundArtifacts, podLog)
+				}
+
+			}
+		default:
 		}
 	}
-	return artifacts, nil
+	return foundArtifacts, nil
 
 }
