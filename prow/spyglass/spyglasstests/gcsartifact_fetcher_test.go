@@ -16,9 +16,15 @@ limitations under the License.
 
 package spyglasstests
 
-// Tests getting handles to objects associated with the current job in GCS
-// TODO: fake-gcs-server does not support the GCS XML API
-//func TestGCSFetchArtifacts(t *testing.T) {
+import (
+	"testing"
+
+	"k8s.io/test-infra/prow/spyglass"
+)
+
+// Tests listing objects associated with the current job in GCS
+// TODO: fake-gcs-server does not support the GCS XML API, may use a fake S3 server >.<
+//func TestGCSListArtifacts(t *testing.T) {
 //	blgArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(buildLogName), "", buildLogName)
 //	srtArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(startedName), "", startedName)
 //	finArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(finishedName), "", finishedName)
@@ -62,3 +68,33 @@ package spyglasstests
 //		}
 //	}
 //}
+
+// Tests getting handles to objects associated with the current job in GCS
+func TestGCSFetchArtifacts(t *testing.T) {
+	blgArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object("logs/example-ci-run/403/build-log.txt"), "", "build-log.txt")
+	testCases := []struct {
+		name            string
+		artifactName    string
+		gcsJobSource    *spyglass.GCSJobSource
+		expectedSize    int64
+		expectedJobPath string
+	}{
+		{
+			name:            "Fetch build-log.txt from example CI Run #403 Artifacts",
+			artifactName:    "build-log.txt",
+			gcsJobSource:    fakeGCSJobSource,
+			expectedSize:    26,
+			expectedJobPath: "build-log.txt",
+		},
+	}
+
+	for _, tc := range testCases {
+		artifact := testAf.Artifact(tc.gcsJobSource, tc.artifactName)
+		if artifact.JobPath() != tc.expectedJobPath {
+			t.Errorf("%s expected artifact with job path %s but got %s", tc.name, tc.expectedJobPath, artifact.JobPath())
+		}
+		if artifact.Size() != tc.expectedSize {
+			t.Errorf("%s expected artifact with size %d but got %d", tc.name, tc.expectedSize, artifact.Size())
+		}
+	}
+}

@@ -44,8 +44,8 @@ var dumpMetadata = viewers.ViewMetadata{
 
 // Tests getting a view from a viewer
 func TestView(t *testing.T) {
-	junitArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(junitKey), "", junitName)
-	buildLogArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(buildLogKey), "", buildLogName)
+	junitArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object("logs/example-ci-run/403/junit_01.xml"), "", "junit_01.xml")
+	buildLogArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object("logs/example-ci-run/403/build-log.txt"), "", "build-log.txt")
 	err := viewers.RegisterViewer("DumpView", dumpMetadata, dumpViewHandler)
 	if err != nil {
 		t.Fatal("Failed to register viewer for testing View")
@@ -137,8 +137,8 @@ func TestRegisterViewer(t *testing.T) {
 
 // Tests reading last N Lines from files in GCS
 func TestGCSReadLastNLines(t *testing.T) {
-	buildLogArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(buildLogKey), "", buildLogName)
-	//longLogArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object(longLogKey), "", longLogName)
+	buildLogArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object("logs/example-ci-run/403/build-log.txt"), "", "buildLogName")
+	longLogArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object("logs/example-ci-run/403/long-log.txt"), "", "log-log.txt")
 	testCases := []struct {
 		name     string
 		n        int64
@@ -157,12 +157,12 @@ func TestGCSReadLastNLines(t *testing.T) {
 			a:        buildLogArtifact,
 			expected: []string{"Oh wow", "logs", "this is", "crazy"},
 		},
-		//{
-		//	name:     "Read last 100 lines of a long log file",
-		//	n:        100,
-		//	a:        longLogArtifact,
-		//	expected: longLogLines[len(longLogLines)-100:],
-		//},
+		{
+			name:     "Read last 30 lines of a long log file",
+			n:        30,
+			a:        longLogArtifact,
+			expected: []string{},
+		},
 	}
 	for _, tc := range testCases {
 		actual, err := viewers.LastNLines(tc.a, tc.n)

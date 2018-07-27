@@ -107,18 +107,19 @@ func (a *PodLogArtifact) ReadAtMost(n int64) ([]byte, error) {
 
 // ReadTail reads the last n bytes of the pod log
 func (a *PodLogArtifact) ReadTail(n int64) ([]byte, error) {
-	logs, err := a.ja.GetJobLogTail(a.name, a.buildID, n)
-	if err != nil {
-		logrus.WithField("artifactName", a.name).WithError(err).Error("Error getting pod logs tail")
-	}
-	off := int64(len(logs)) - n - 1
-	p := []byte{}
-	_, err = bytes.NewReader(logs).ReadAt(p, off)
-	if err != nil {
-		logrus.WithError(err).Error("Failed to read pod logs.")
-	}
-	return p, err
-
+	// TODO waiting on #8850
+	//logs, err := a.ja.GetJobLogTail(a.name, a.buildID, n)
+	//if err != nil {
+	//	logrus.WithField("artifactName", a.name).WithError(err).Error("Error getting pod logs tail")
+	//}
+	//off := int64(len(logs)) - n - 1
+	//p := []byte{}
+	//_, err = bytes.NewReader(logs).ReadAt(p, off)
+	//if err != nil {
+	//	logrus.WithError(err).Error("Failed to read pod logs.")
+	//}
+	//return p, err
+	return []byte{}, nil
 }
 
 // Size gets the size of the pod log. Note: this function makes the same network call as reading the entire file.

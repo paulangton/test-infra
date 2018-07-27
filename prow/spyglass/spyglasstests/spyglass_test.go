@@ -20,8 +20,6 @@ package spyglasstests
 import (
 	"fmt"
 	"os"
-	"path"
-	"strings"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -37,16 +35,6 @@ var (
 	testAf           *spyglass.GCSArtifactFetcher
 	fakeJa           *jobs.JobAgent
 	fakeGCSJobSource *spyglass.GCSJobSource
-	buildLogName     string
-	longLogName      string
-	junitName        string
-	startedName      string
-	finishedName     string
-	junitKey         string
-	buildLogKey      string
-	longLogKey       string
-	startedKey       string
-	finishedKey      string
 )
 
 const (
@@ -86,35 +74,24 @@ func (f fpkc) GetContainerLog(pod, container string) ([]byte, error) {
 func TestMain(m *testing.M) {
 	fakeGCSJobSource = spyglass.NewGCSJobSource(testSrc)
 	testBucketName := fakeGCSJobSource.BucketName()
-	buildLogName = "build-log.txt"
-	startedName = "started.json"
-	finishedName = "finished.json"
-	longLogName = "long-log.txt"
-	junitName = "artifacts/junit_01.xml"
-	buildLogKey = path.Join(fakeGCSJobSource.JobPath(), buildLogName)
-	startedKey = path.Join(fakeGCSJobSource.JobPath(), startedName)
-	finishedKey = path.Join(fakeGCSJobSource.JobPath(), finishedName)
-	longLogKey = path.Join(fakeGCSJobSource.JobPath(), longLogName)
-	junitKey = path.Join(fakeGCSJobSource.JobPath(), junitName)
-	var string longLog
+	var longLog string
 	for i := 0; i < 100; i++ {
 		longLog += "here a log\nthere a log\neverywhere a log log"
 	}
-	longLogLines = strings.Split(string(longLog), "\n")
 	fakeGCSServer := fakestorage.NewServer([]fakestorage.Object{
 		{
 			BucketName: testBucketName,
-			Name:       buildLogKey,
+			Name:       "logs/example-ci-run/403/build-log.txt",
 			Content:    []byte("Oh wow\nlogs\nthis is\ncrazy"),
 		},
 		{
 			BucketName: testBucketName,
-			Name:       longLogKey,
+			Name:       "logs/example-ci-run/403/long-log.txt",
 			Content:    longLog,
 		},
 		{
 			BucketName: testBucketName,
-			Name:       junitKey,
+			Name:       "logs/example-ci-run/403/junit_01.xml",
 			Content: []byte(`<testsuite tests="1017" failures="1017" time="0.016981535">
 <testcase name="BeforeSuite" classname="Kubernetes e2e suite" time="0.006343795">
 <failure type="Failure">
@@ -125,7 +102,7 @@ test/e2e/e2e.go:137 BeforeSuite on Node 1 failed test/e2e/e2e.go:137
 		},
 		{
 			BucketName: testBucketName,
-			Name:       startedKey,
+			Name:       "logs/example-ci-run/403/started.json",
 			Content: []byte(`{
 						  "node": "gke-prow-default-pool-3c8994a8-qfhg", 
 						  "repo-version": "v1.12.0-alpha.0.985+e6f64d0a79243c", 
@@ -142,7 +119,7 @@ test/e2e/e2e.go:137 BeforeSuite on Node 1 failed test/e2e/e2e.go:137
 		},
 		{
 			BucketName: testBucketName,
-			Name:       finishedKey,
+			Name:       "logs/example-ci-run/403/finished.json",
 			Content: []byte(`{
 						  "timestamp": 1528742943, 
 						  "version": "v1.12.0-alpha.0.985+e6f64d0a79243c", 
