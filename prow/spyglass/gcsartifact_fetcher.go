@@ -54,11 +54,11 @@ type GCSJobSource struct {
 }
 
 // NewGCSArtifactFetcher creates a new ArtifactFetcher with a real GCS Client
-func NewGCSArtifactFetcher(c *storage.Client) *GCSArtifactFetcher {
+func NewGCSArtifactFetcher(c *storage.Client, xmlEndpoint string, tls bool) *GCSArtifactFetcher {
 	return &GCSArtifactFetcher{
 		client:      c,
-		xmlEndpoint: "https://storage.googleapis.com/",
-		withTLS:     true,
+		xmlEndpoint: xmlEndpoint,
+		withTLS:     tls,
 	}
 }
 

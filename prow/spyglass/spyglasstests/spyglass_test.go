@@ -87,7 +87,7 @@ func TestMain(m *testing.M) {
 		{
 			BucketName: testBucketName,
 			Name:       "logs/example-ci-run/403/long-log.txt",
-			Content:    longLog,
+			Content:    []byte(longLog),
 		},
 		{
 			BucketName: testBucketName,
@@ -142,11 +142,7 @@ test/e2e/e2e.go:137 BeforeSuite on Node 1 failed test/e2e/e2e.go:137
 	defer fakeGCSServer.Stop()
 	fakeGCSClient := fakeGCSServer.Client()
 	fakeGCSBucket = fakeGCSClient.Bucket(testBucketName)
-	testAf = &spyglass.GCSArtifactFetcher{
-		Client:      fakeGCSClient,
-		XMLEndpoint: fakeGCSServer.URL() + "/storage/v1",
-		WithTLS:     false,
-	}
+	testAf = spyglass.NewGCSArtifactFetcher(fakeGCSClient, fakeGCSServer.URL()+"/storage/v1", false)
 	kc := fkc{
 		kube.ProwJob{
 			Spec: kube.ProwJobSpec{

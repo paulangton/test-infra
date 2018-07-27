@@ -181,7 +181,7 @@ func prodOnlyMain(configAgent *config.Agent, o options, mux *http.ServeMux) *htt
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GCS client")
 	}
-	sg := spyglass.New(ja, []spyglass.ArtifactFetcher{spyglass.NewGCSArtifactFetcher(c)})
+	sg := spyglass.New(ja, []spyglass.ArtifactFetcher{spyglass.NewGCSArtifactFetcher(c, "https://storage.googleapis.com/", true)})
 
 	// setup prod only handlers
 	mux.Handle("/data.js", gziphandler.GzipHandler(handleData(ja)))

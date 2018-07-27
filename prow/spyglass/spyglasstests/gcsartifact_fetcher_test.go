@@ -71,7 +71,6 @@ import (
 
 // Tests getting handles to objects associated with the current job in GCS
 func TestGCSFetchArtifacts(t *testing.T) {
-	blgArtifact := spyglass.NewGCSArtifact(fakeGCSBucket.Object("logs/example-ci-run/403/build-log.txt"), "", "build-log.txt")
 	testCases := []struct {
 		name            string
 		artifactName    string
@@ -83,7 +82,7 @@ func TestGCSFetchArtifacts(t *testing.T) {
 			name:            "Fetch build-log.txt from example CI Run #403 Artifacts",
 			artifactName:    "build-log.txt",
 			gcsJobSource:    fakeGCSJobSource,
-			expectedSize:    26,
+			expectedSize:    25,
 			expectedJobPath: "build-log.txt",
 		},
 	}
