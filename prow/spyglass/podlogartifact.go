@@ -107,6 +107,7 @@ func (a *PodLogArtifact) ReadAtMost(n int64) ([]byte, error) {
 
 // ReadTail reads the last n bytes of the pod log
 func (a *PodLogArtifact) ReadTail(n int64) ([]byte, error) {
+	logrus.Info("ReadTail currently unsupported for pod logs")
 	// TODO waiting on #8850
 	//logs, err := a.ja.GetJobLogTail(a.name, a.buildID, n)
 	//if err != nil {

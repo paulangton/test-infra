@@ -12,8 +12,7 @@ A typical Spyglass page might look something like this:
 
 A general Spyglass query will proceed as follows:
 - User provides a job source in the query (usually a job name and build ID).
-- Spyglass performs a `list` call on the source and finds all artifact names
-  associated with that job source.
+- Spyglass finds all artifact names associated with the given job source.
 - Spyglass builds a cache of which artifacts match which viewers via
   configured regular expressions.
 - Viewers with matching artifacts are pre-rendered in order of descending

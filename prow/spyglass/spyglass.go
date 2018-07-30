@@ -179,8 +179,8 @@ func neededArtifacts(haveArtifacts []string) []string {
 // FetchArtifacts constructs and returns Artifact objects for each artifact name in the list.
 // This includes getting any handles needed for read write operations, direct artifact links, etc.
 func (s *Spyglass) FetchArtifacts(src string, podName string, artifactNames []string) ([]viewers.Artifact, error) {
-	neededNames := neededArtifacts(artifactNames)
 	foundArtifacts := []viewers.Artifact{}
+	foundArtifactNames := []string{}
 	for _, ep := range s.Eyepieces {
 		jobSource, err := ep.CreateJobSource(src)
 		if err != nil {
@@ -191,14 +191,17 @@ func (s *Spyglass) FetchArtifacts(src string, podName string, artifactNames []st
 		}
 		artStart := time.Now()
 		for _, name := range artifactNames {
-			foundArtifacts = append(foundArtifacts, ep.Artifact(jobSource, name))
+			artifact := ep.Artifact(jobSource, name)
+			foundArtifacts = append(foundArtifacts, artifact)
+			foundArtifactNames = append(foundArtifactNames, artifact.JobPath())
 		}
 		artElapsed := time.Since(artStart)
 		logrus.Info("Retrieved artifacts in ", artElapsed)
 
 	}
 
-	for _, ga := range neededNames {
+	neededArtifactNames := neededArtifacts(foundArtifactNames)
+	for _, ga := range neededArtifactNames {
 		switch ga {
 		case "build-log.txt":
 			if isProwJobSource(src) {
