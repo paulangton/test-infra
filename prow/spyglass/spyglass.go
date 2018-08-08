@@ -215,9 +215,13 @@ func (s *Spyglass) FetchArtifacts(src string, podName string, sizeLimit int64, a
 				} else {
 					return foundArtifacts, errors.New("invalid Prowjob source provided")
 				}
+				_, err := s.JobAgent.GetProwJob(jobName, buildID)
+				if err != nil {
+					continue
+				}
 				podLog, err := NewPodLogArtifact(jobName, buildID, podName, sizeLimit, s.JobAgent)
 				if err != nil {
-					logrus.WithField("src", src).WithError(err).Error("Error accessing pod log from given source")
+					logrus.WithField("src", src).WithError(err).Error("Error accessing pod log from given source.")
 					continue
 				}
 				foundArtifacts = append(foundArtifacts, podLog)

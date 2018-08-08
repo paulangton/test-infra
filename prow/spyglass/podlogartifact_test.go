@@ -18,11 +18,38 @@ package spyglass
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
 
 	"k8s.io/test-infra/prow/deck/jobs"
+	"k8s.io/test-infra/prow/spyglass/viewers"
 )
+
+type podLogJAgent struct {
+}
+
+func (j *podLogJAgent) GetJobLog(job, id string) ([]byte, error) {
+	if job == "BFG" && id == "435" {
+		return []byte("frobscottle"), nil
+	} else if job == "Fantastic Mr. Fox" && id == "4" {
+		return []byte("a hundred smoked hams and fifty sides of bacon"), nil
+	}
+	return nil, fmt.Errorf("could not find job %s, id %s", job, id)
+}
+
+func (j *podLogJAgent) GetJobLogTail(job, id string, n int64) ([]byte, error) {
+	log, err := j.GetJobLog(job, id)
+	if err != nil {
+		return nil, fmt.Errorf("error getting log tail: %v", err)
+	}
+	logLen := int64(len(log))
+	if n > logLen {
+		return log, nil
+	}
+	return log[logLen-n:], nil
+
+}
 
 func TestNewPodLogArtifact(t *testing.T) {
 	testCases := []struct {
@@ -221,34 +248,58 @@ func TestPodLogReadAtMost(t *testing.T) {
 }
 
 func TestPodLogReadAll(t *testing.T) {
-	jobArtifact, err := NewPodLogArtifact("job", "123", "", 500e6, fakeJa)
+	fakePodLogAgent := &podLogJAgent{}
+	notFoundArtifact, err := NewPodLogArtifact("job", "123", "", 500e6, fakePodLogAgent)
 	if err != nil {
 		t.Fatalf("Pod Log Tests failed to create pod log artifact, err %v", err)
 	}
-	jibArtifact, err := NewPodLogArtifact("jib", "123", "", 500e6, fakeJa)
+	bfgArtifact, err := NewPodLogArtifact("BFG", "435", "", 500e6, fakePodLogAgent)
+	if err != nil {
+		t.Fatalf("Pod Log Tests failed to create pod log artifact, err %v", err)
+	}
+	foxArtifact, err := NewPodLogArtifact("Fantastic Mr. Fox", "4", "", 500e6, fakePodLogAgent)
+	if err != nil {
+		t.Fatalf("Pod Log Tests failed to create pod log artifact, err %v", err)
+	}
+	foxLowLimitArtifact, err := NewPodLogArtifact("Fantastic Mr. Fox", "4", "", 5, fakePodLogAgent)
 	if err != nil {
 		t.Fatalf("Pod Log Tests failed to create pod log artifact, err %v", err)
 	}
 	testCases := []struct {
-		name     string
-		artifact *PodLogArtifact
-		expected []byte
+		name        string
+		artifact    *PodLogArtifact
+		expectedErr error
+		expected    []byte
 	}{
 		{
-			name:     "\"Job\" Podlog readall",
-			artifact: jobArtifact,
-			expected: []byte("clusterA"),
+			name:        "Podlog readall not found",
+			artifact:    notFoundArtifact,
+			expectedErr: fmt.Errorf("error getting pod log size: error getting size of pod log: could not find job job, id 123"),
+			expected:    []byte(""),
 		},
 		{
-			name:     "\"Jib\" Podlog readall",
-			artifact: jibArtifact,
-			expected: []byte("clusterB"),
+			name:        "\"BFG\" Podlog readall",
+			artifact:    bfgArtifact,
+			expectedErr: nil,
+			expected:    []byte("frobscottle"),
+		},
+		{
+			name:        "\"Fantastic Mr. Fox\" Podlog readall",
+			artifact:    foxArtifact,
+			expectedErr: nil,
+			expected:    []byte("a hundred smoked hams and fifty sides of bacon"),
+		},
+		{
+			name:        "Podlog readall over size limit",
+			artifact:    foxLowLimitArtifact,
+			expectedErr: viewers.ErrFileTooLarge,
+			expected:    []byte(""),
 		},
 	}
 	for _, tc := range testCases {
 		res, err := tc.artifact.ReadAll()
-		if err != nil {
-			t.Fatalf("%s failed reading bytes of log. err: %s", tc.name, err)
+		if err != nil && err.Error() != tc.expectedErr.Error() {
+			t.Fatalf("%s failed reading bytes of log. got err: %v, expected err: %v", tc.name, err, tc.expectedErr)
 		}
 		if !bytes.Equal(tc.expected, res) {
 			t.Errorf("Unexpected result of reading pod logs, expected %q, got %q", tc.expected, res)

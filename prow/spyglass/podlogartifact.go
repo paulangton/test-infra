@@ -25,9 +25,13 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/test-infra/prow/deck/jobs"
 	"k8s.io/test-infra/prow/spyglass/viewers"
 )
+
+type podLogJobAgent interface {
+	GetJobLog(job string, id string) ([]byte, error)
+	GetJobLogTail(job string, id string, n int64) ([]byte, error)
+}
 
 // PodLogArtifact holds data for reading from a specific pod log
 type PodLogArtifact struct {
@@ -35,7 +39,7 @@ type PodLogArtifact struct {
 	buildID   string
 	podName   string
 	sizeLimit int64
-	ja        *jobs.JobAgent
+	ja        podLogJobAgent
 }
 
 var (
@@ -44,7 +48,7 @@ var (
 )
 
 // NewPodLogArtifact creates a new PodLogArtifact
-func NewPodLogArtifact(jobName string, buildID string, podName string, sizeLimit int64, ja *jobs.JobAgent) (*PodLogArtifact, error) {
+func NewPodLogArtifact(jobName string, buildID string, podName string, sizeLimit int64, ja podLogJobAgent) (*PodLogArtifact, error) {
 	if jobName == "" {
 		return &PodLogArtifact{}, errInsufficientJobInfo
 	}
